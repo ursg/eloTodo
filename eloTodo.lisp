@@ -3,30 +3,21 @@
 (ql:quickload '#:com.inuoe.jzon)
 (sb-ext:add-package-local-nickname '#:jzon '#:com.inuoe.jzon) 
 
-(defstruct item
-  (name "" :type string)
-  (rating 0 :type integer)
-  (matches 0 :type integer)
-  (done nil :type boolean))
+(defclass item ()
+  ((name :initarg :name :accessor item-name)
+   (rating :initarg :rating :accessor item-rating :initform 1200)
+   (matches :initarg :matches :accessor item-matches :initform 0)
+   (done :initarg :done :accessor item-done :initform nil)))
 
-; Adjust elo score rating of two items after a match
-(defun score (winner loser)
-   (let* ((R_a (item-rating winner))
-          (R_b (item-rating loser))
-          (K 32)
-          (E_a ($ 1.0 / (1.0 + 10.0 ^ ((R_a - R_b) / 400.0))))
-          (E_b ($ 1.0 / (1.0 + 10.0 ^ ((R_b - R_a) / 400.0)))))
-      (setf (item-rating winner) ($ R_a + K * (1. - E_a)))
-      (incf (item-matches winner))
-      (setf (item-rating loser)  ($ R_b + K * (0. - E_b)))
-      (incf (item-matches loser))))
+(defmethod print-object ((foo item) out)
+  (format out "[~A] ~A: ~A" (if (item-done foo) "X" " ") (item-rating foo) (item-name foo)))
 
 
 ; Read json input file
 (defvar *ranking* (with-open-file (in "~/elo-todo.json.json")
                    (map 'list
                         (lambda (i) 
-                         (make-item
+                         (make-instance 'item
                            :name (gethash "name" i)
                            :rating (gethash "rating" i)
                            :matches (gethash "matches" i)))
@@ -35,8 +26,10 @@
 ; sort the list by rating
 (setf *ranking* (sort *ranking* #'(lambda (a b) (> (item-rating a) (item-rating b)))))
 
+; --------------- Competition handling ----------------
 (defvar *current-compo* (list (first *ranking*) (second *ranking*)))
 
+; TODO: Bail out if only one entry in the ranking
 (defun new-compo ()
   (let ((i (random (length *ranking*)))
         (j (random (length *ranking*))))
@@ -45,21 +38,33 @@
       (setf *current-compo* 
             (list (elt *ranking* i) (elt *ranking* j))))))
 
+; Adjust elo score rating of two items after a match
+(defun score (winner loser)
+   (let* ((R_a (item-rating winner))
+          (R_b (item-rating loser))
+          (K 32)
+          (E_a ($ 1.0 / (1.0 + 10.0 ^ ((R_a - R_b) / 400.0))))
+          (E_b ($ 1.0 / (1.0 + 10.0 ^ ((R_b - R_a) / 400.0)))))
+      (setf (item-rating winner) (floor ($ R_a + K * (1. - E_a))))
+      (incf (item-matches winner))
+      (setf (item-rating loser)  (floor ($ R_b + K * (0. - E_b))))
+      (incf (item-matches loser))))
+
 (defun score-compo (winner)
   (cond
      ((eq winner 0) (new-compo))
-     ((> winner 0) (prog
+     ((> winner 0) (progn
                      (score (second *current-compo*) (first *current-compo*))
                      (new-compo)
                      (setf *ranking* (sort *ranking* #'(lambda (a b) (> (item-rating a) (item-rating b)))))))
-     ((< winner 0) (prog
+     ((< winner 0) (progn
                      (score (first *current-compo*) (second *current-compo*))
                      (new-compo)
                      (setf *ranking* (sort *ranking* #'(lambda (a b) (> (item-rating a) (item-rating b)))))))))
 
 (new-compo)
 
-; TUI
+; --------------------- TUI --------------------------
 (ql:quickload 'cl-tui)
 (use-package 'cl-tui)
 
@@ -103,6 +108,7 @@
                   (format nil "[~4A] ~A" points2 name2)))))
 
 ; ------------- Ranking dialog ---------------
+; TODO: limit string width
 (defun ranking-render (&key frame h w)
   (draw-box frame)
   (with-attributes ((:color inverse)) frame
@@ -116,7 +122,6 @@
           (put-text frame i 1
                     (format nil "~3A: [~4A] ~A" i (item-rating item) (item-name item))))))
           
-
 
 (define-frame container (container-frame) :on :root)
 (define-frame choice (simple-frame :render 'choice-render) :on container :h 7)
