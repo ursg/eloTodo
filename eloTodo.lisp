@@ -1,8 +1,9 @@
-(ql:quickload "infix-math")
+(ql:quickload 'infix-math)
 (use-package 'infix-math)
 (ql:quickload '#:com.inuoe.jzon)
 (sb-ext:add-package-local-nickname '#:jzon '#:com.inuoe.jzon) 
 (ql:quickload 'serapeum)
+(ql:quickload 'uiop)
 
 (defparameter *filename* "./todo.json")
 
@@ -37,16 +38,21 @@
            :matches (gethash "matches" i)))
         (gethash "players" (jzon:parse in)))))
 
+(defvar *ranking* (load-json)) 
+
 ; Write json output file
 (defun write-json () 
   (with-open-file (out *filename* :direction :output :if-exists :supersede)
     (jzon:stringify (serapeum:dict "players" *ranking*) :stream out :pretty t)))
 
-(defvar *ranking* (load-json)) 
 (defun sort-ranking ()
   "Sort the TODO-list by elo rating"
   (setf *ranking* (sort *ranking* #'(lambda (a b) (> (item-rating a) (item-rating b))))))
 
+(defun clamp (v min max)
+  (cond ((< v min) min)
+        ((>= v max) (- max 1))
+        (t v)))
 
 ; --------------- Competition handling ----------------
 (defvar *current-compo* (list (first *ranking*) (second *ranking*)))
@@ -131,20 +137,32 @@
 
 ; ------------- Ranking dialog ---------------
 ; TODO: limit string width
+(defvar *list-scroll* 0)
 (defun ranking-render (&key frame h w)
+
+  ; Frame and title
   (with-attributes ((:color normal)) frame
     (draw-box frame))
   (with-attributes ((:color inverse)) frame
     (put-text frame 0 3 "[TODO list items]"))
-  (loop for i from 1 to (min (- h 2) (length *ranking*)) 
-        and item in *ranking* do
-        (if (eq (+ *cursor-index* 1) i)
+
+  ; Make sure the current selection is within the window
+  (if (> (- *cursor-index* *list-scroll*) (- h 3))
+    (setf *list-scroll* (clamp (- *cursor-index* h -3) 0 (length *ranking*))))
+  (if (< (- *cursor-index* *list-scroll*) 0)
+    (setf *list-scroll* (clamp *cursor-index* 0 (length *ranking*))))
+
+  ; Put all items
+  (loop for i from *list-scroll* below (length *ranking*)
+        and row from 1 below (- h 1) do
+      (let ((item (elt *ranking* i)))
+        (if (eq *cursor-index* i)
           (with-attributes ((:color selection)) frame
-                           (put-text frame i 1
+                           (put-text frame row 1
                                     (format nil "~3A: [~4A] ~A" i (item-rating item) (item-name item))))
           (with-attributes ((:color normal)) frame
-                           (put-text frame i 1
-                                     (format nil "~3A: [~4A] ~A" i (item-rating item) (item-name item)))))))
+                           (put-text frame row 1
+                                     (format nil "~3A: [~4A] ~A" i (item-rating item) (item-name item))))))))
           
 
 (define-frame container (container-frame) :on :root)
@@ -152,11 +170,6 @@
 (define-frame ranking (simple-frame :render 'ranking-render) :on container)
 
 (defvar *keys* (list))
-
-(defun clamp (v min max)
-  (cond ((< v min) min)
-        ((>= v max) (- max 1))
-        (t v)))
 
 ; -------------------- Initialization ---------------
 (sort-ranking)
@@ -179,6 +192,10 @@
             (:KEY-DOWN (setf *cursor-index* (clamp (+ *cursor-index* 1) 0 (length *ranking*))))
             (#\Newline (setf (item-done (elt *ranking* *cursor-index*)) t))
 
+            ; Scroll list
+            (:KEY-NPAGE (setf *cursor-index* (clamp (+ *cursor-index* 20) 0 (length *ranking*))))
+            (:KEY-PPAGE (setf *cursor-index* (clamp (- *cursor-index* 20) 0 (length *ranking*))))
+
             ; Compo time
             (:KEY-LEFT (score-compo -1))
             (:KEY-RIGHT (score-compo 1))
@@ -190,3 +207,4 @@
   (format t "~A~%" i))
 
 (write-json)
+(uiop:quit)
