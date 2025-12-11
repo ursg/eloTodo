@@ -2,29 +2,51 @@
 (use-package 'infix-math)
 (ql:quickload '#:com.inuoe.jzon)
 (sb-ext:add-package-local-nickname '#:jzon '#:com.inuoe.jzon) 
+(ql:quickload 'serapeum)
+
+(defparameter *filename* "./todo.json")
 
 (defclass item ()
-  ((name :initarg :name :accessor item-name)
-   (rating :initarg :rating :accessor item-rating :initform 1200)
-   (matches :initarg :matches :accessor item-matches :initform 0)
-   (done :initarg :done :accessor item-done :initform nil)))
+  ((name 
+     :initarg :name 
+     :accessor item-name)
+   (rating 
+     :initarg :rating 
+     :accessor item-rating :initform 1200)
+   (matches 
+     :initarg :matches 
+     :accessor item-matches 
+     :initform 0)
+   (done 
+     :initarg :done 
+     :type boolean 
+     :accessor item-done 
+     :initform nil)))
 
 (defmethod print-object ((foo item) out)
   (format out "[~A] ~A: ~A" (if (item-done foo) "X" " ") (item-rating foo) (item-name foo)))
 
-
 ; Read json input file
-(defvar *ranking* (with-open-file (in "~/elo-todo.json.json")
-                   (map 'list
-                        (lambda (i) 
-                         (make-instance 'item
-                           :name (gethash "name" i)
-                           :rating (gethash "rating" i)
-                           :matches (gethash "matches" i)))
-                        (gethash "players" (jzon:parse in)))))
+(defun load-json ()
+  (with-open-file (in *filename*)
+   (map 'list
+        (lambda (i) 
+         (make-instance 'item
+           :name (gethash "name" i)
+           :rating (gethash "rating" i)
+           :matches (gethash "matches" i)))
+        (gethash "players" (jzon:parse in)))))
 
-; sort the list by rating
-(setf *ranking* (sort *ranking* #'(lambda (a b) (> (item-rating a) (item-rating b)))))
+; Write json output file
+(defun write-json () 
+  (with-open-file (out *filename* :direction :output :if-exists :supersede)
+    (jzon:stringify (serapeum:dict "players" *ranking*) :stream out :pretty t)))
+
+(defvar *ranking* (load-json)) 
+(defun sort-ranking ()
+  "Sort the TODO-list by elo rating"
+  (setf *ranking* (sort *ranking* #'(lambda (a b) (> (item-rating a) (item-rating b))))))
+
 
 ; --------------- Competition handling ----------------
 (defvar *current-compo* (list (first *ranking*) (second *ranking*)))
@@ -55,14 +77,13 @@
      ((eq winner 0) (new-compo))
      ((> winner 0) (progn
                      (score (second *current-compo*) (first *current-compo*))
-                     (new-compo)
-                     (setf *ranking* (sort *ranking* #'(lambda (a b) (> (item-rating a) (item-rating b)))))))
+                     (new-compo)))
      ((< winner 0) (progn
                      (score (first *current-compo*) (second *current-compo*))
-                     (new-compo)
-                     (setf *ranking* (sort *ranking* #'(lambda (a b) (> (item-rating a) (item-rating b)))))))))
+                     (new-compo)))
+   (sort-ranking)
+   (write-json)))
 
-(new-compo)
 
 ; --------------------- TUI --------------------------
 (ql:quickload 'cl-tui)
@@ -71,6 +92,7 @@
 (defvar *cursor-index* 0)
 
 ; Colors
+(defvar normal (color-pair (color 750 750 750) (color 0 0 0)))
 (defvar inverse (color-pair (color 0 0 0) (color 1000 1000 1000)))
 (defvar selection (color-pair (color 0 0 0) (color 1000 1000 0)))
 (defvar winner (color-pair (color 500 1000 500) (color 0 0 0)))
@@ -110,7 +132,8 @@
 ; ------------- Ranking dialog ---------------
 ; TODO: limit string width
 (defun ranking-render (&key frame h w)
-  (draw-box frame)
+  (with-attributes ((:color normal)) frame
+    (draw-box frame))
   (with-attributes ((:color inverse)) frame
     (put-text frame 0 3 "[TODO list items]"))
   (loop for i from 1 to (min (- h 2) (length *ranking*)) 
@@ -119,8 +142,9 @@
           (with-attributes ((:color selection)) frame
                            (put-text frame i 1
                                     (format nil "~3A: [~4A] ~A" i (item-rating item) (item-name item))))
-          (put-text frame i 1
-                    (format nil "~3A: [~4A] ~A" i (item-rating item) (item-name item))))))
+          (with-attributes ((:color normal)) frame
+                           (put-text frame i 1
+                                     (format nil "~3A: [~4A] ~A" i (item-rating item) (item-name item)))))))
           
 
 (define-frame container (container-frame) :on :root)
@@ -134,14 +158,21 @@
         ((>= v max) (- max 1))
         (t v)))
 
-;(define-frame log (log-frame) :on :root)
+; -------------------- Initialization ---------------
+(sort-ranking)
+(new-compo)
+
+; --------------------- Main loop ------------------
 (with-screen (:colors)
-    (loop
+    (loop 
        (refresh)
        (let ((key (read-key)))
           (case key
             (#\q (return))
             (#\Esc (return))
+            (#\l (progn
+                   (load-json)
+                   (sort-ranking)))
 
             ; Cursor selection
             (:KEY-UP (setf *cursor-index* (clamp (- *cursor-index* 1) 0 (length *ranking*))))
@@ -158,11 +189,4 @@
 (loop for i in *keys* do
   (format t "~A~%" i))
 
-; Pretty-print ranking table
-;(ql:quickload 'cl-ansi-term)
-;(term:table 
-;  (cons
-;    (list "Rank" "Name" "Rating" "Matches")
-;    (loop for i in *ranking*
-;      collect (list (item-name i) (item-rating i) (item-matches i))))
-;  :column-width '(60 7 5))
+(write-json)
