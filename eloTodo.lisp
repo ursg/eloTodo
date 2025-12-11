@@ -97,7 +97,7 @@
 (use-package 'cl-tui)
 
 (defun put-text-clamped (frame w h y x string)
-  "Skip text that's completely out-of-frame"
+  "Skip text that's out-of-frame"
    (if (>= x w) 
      (return-from put-text-clamped))
    (if (>= y h)
@@ -222,7 +222,6 @@
             ; Cursor selection
             (:KEY-UP (setf *cursor-index* (clamp (- *cursor-index* 1) 0 (length *ranking*))))
             (:KEY-DOWN (setf *cursor-index* (clamp (+ *cursor-index* 1) 0 (length *ranking*))))
-            (#\Newline (setf (item-done (elt *ranking* *cursor-index*)) t))
 
             ; Scroll list
             (:KEY-NPAGE (setf *cursor-index* (clamp (+ *cursor-index* 20) 0 (length *ranking*))))
