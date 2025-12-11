@@ -25,7 +25,7 @@
      :initform nil)))
 
 (defmethod print-object ((foo item) out)
-  (format out "[~A] ~A: ~A" (if (item-done foo) "X" " ") (item-rating foo) (item-name foo)))
+  (format out "[~A] ~A (~A): ~A" (if (item-done foo) "X" " ") (item-rating foo) (item-matches foo) (item-name foo)))
 
 ; Read json input file
 (defun load-json ()
@@ -115,7 +115,9 @@
 
 ; ------------- Choice dialog (current compo) ---------------
 (defun choice-render (&key frame h w)
-  (draw-box frame)
+  (with-attributes ((:color normal)) frame
+    (draw-box frame)
+    (put-text frame (- h 1) 3 "[l/left/r/right: Choose winner, space: draw]"))
   (with-attributes ((:color inverse)) frame
     (put-text frame 0 3 "[Current competition:]"))
   (let ((name1 (item-name (first *current-compo*)))
@@ -144,7 +146,8 @@
 
   ; Frame and title
   (with-attributes ((:color normal)) frame
-    (draw-box frame))
+    (draw-box frame)
+    (put-text frame (- h 1) 3 "[up/down: cycle list, d: done, u: undone, n: new item]"))
   (with-attributes ((:color inverse)) frame
     (put-text frame 0 3 "[TODO list items]"))
 
@@ -166,11 +169,17 @@
           (with-attributes ((:color color)) frame
                              (put-text frame row 1
                                        (format nil "~3A: ~A" i item))))))
-          
+  
+
+; ----------------- New item dialog ----------------
+(defun new-item-render (&key frame h w)
+  (draw-box frame))
 
 (define-frame container (container-frame) :on :root)
 (define-frame choice (simple-frame :render 'choice-render) :on container :h 7)
 (define-frame ranking (simple-frame :render 'ranking-render) :on container)
+(define-frame new-item (container-frame))
+(define-frame input (edit-frame :prompt "New Item> ") :on new-item :h 1)
 
 (defvar *keys* (list))
 
@@ -186,7 +195,7 @@
           (case key
             (#\q (return))
             (#\Esc (return))
-            (#\l (progn
+            (#\L (progn
                    (load-json)
                    (sort-ranking)))
 
@@ -202,11 +211,27 @@
             ; Done and undone
             (#\d (setf (item-done (elt *ranking* *cursor-index*)) t))
             (#\u (setf (item-done (elt *ranking* *cursor-index*)) nil))
-            (:KEY-RETURN (setf (item-done (elt *ranking* *cursor-index*)) nil))
+            (#\Newline (setf (item-done (elt *ranking* *cursor-index*)) (not (item-done (elt *ranking* *cursor-index*)))))
+
+            ; New item
+            (#\n (progn
+                   (display 'new-item)
+                   (loop
+                     (refresh)
+                     (let ((key (read-key)))
+                       (case key
+                         (#\Esc (return))
+                         (#\Newline (progn
+                                      (push (make-instance 'item :name (get-text 'input)) *ranking*)
+                                      (sort-ranking)
+                                      ;(write-json)
+                                      (return)))
+                         (t (handle-key 'input key)))))
+                   (display :root)))
 
             ; Compo time
-            (:KEY-LEFT (score-compo -1))
-            (:KEY-RIGHT (score-compo 1))
+            ((#\l :KEY-LEFT) (score-compo -1))
+            ((#\r :KEY-RIGHT) (score-compo 1))
             (#\Space (score-compo 0))
 
             (otherwise (push (format nil "Key pressed: ~A" key) *keys*))))))
