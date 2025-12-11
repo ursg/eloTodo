@@ -96,6 +96,25 @@
 (ql:quickload 'cl-tui)
 (use-package 'cl-tui)
 
+(defun put-text-clamped (frame w h y x string)
+  "Skip text that's completely out-of-frame"
+   (if (>= x w) 
+     (return-from put-text-clamped))
+   (if (>= y h)
+     (return-from put-text-clamped))
+
+   (if (< x 1)
+     (progn 
+       (setf string (subseq string (- 1 x) (length string)))
+       (setf x 1)))
+   (if (< y 0)
+     (return-from put-text-clamped))
+
+   (let ((len (length string)))
+     (if (>= (+ len x) (- w 1))
+       (put-text frame y x (subseq string 0 (- w x 1)))
+       (put-text frame y x string))))
+
 (defvar *cursor-index* 0)
 
 ; Colors
@@ -117,39 +136,42 @@
 (defun choice-render (&key frame h w)
   (with-attributes ((:color normal)) frame
     (draw-box frame)
-    (put-text frame (- h 1) 3 "[l/left/r/right: Choose winner, space: draw]"))
+    (put-text-clamped frame w h 
+                      (- h 1) 3 "[l/left/r/right: Choose winner, space: draw]"))
   (with-attributes ((:color inverse)) frame
-    (put-text frame 0 3 "[Current competition:]"))
+    (put-text-clamped frame w h 
+                      0 3 "[Current competition:]"))
   (let ((name1 (item-name (first *current-compo*)))
         (name2 (item-name (second *current-compo*)))
         (points1 (item-rating (first *current-compo*)))
         (points2 (item-rating (second *current-compo*))))
     (with-winnerloser (- points1 points2)
-      (put-text frame 
+      (put-text-clamped frame w h
                   (floor (/ h 2))
                   (floor ($ (w / 4) - (length name1) / 2 - 3)) 
                   (format nil "[~4A] ~A" points1 name1)))
-    (put-text frame
+    (put-text-clamped frame w h
                 (floor (/ h 2)) 
                 (floor (/ w 2))
                 "<=>")
     (with-winnerloser (- points2 points1)
-      (put-text frame 
+      (put-text-clamped frame w h
                   (floor (/ h 2)) 
                   (floor ($ (w / 2) + (w / 4) - (length name2) / 2 - 3))
                   (format nil "[~4A] ~A" points2 name2)))))
 
 ; ------------- Ranking dialog ---------------
-; TODO: limit string width
 (defvar *list-scroll* 0)
 (defun ranking-render (&key frame h w)
 
   ; Frame and title
   (with-attributes ((:color normal)) frame
     (draw-box frame)
-    (put-text frame (- h 1) 3 "[up/down: cycle list, d: done, u: undone, n: new item]"))
+    (put-text-clamped frame w h 
+                      (- h 1) 3 "[up/down: cycle list, d: done, u: undone, n: new item]"))
   (with-attributes ((:color inverse)) frame
-    (put-text frame 0 3 "[TODO list items]"))
+    (put-text-clamped frame w h
+                      0 3 "[TODO list items]"))
 
   ; Make sure the current selection is within the window
   (if (> (- *cursor-index* *list-scroll*) (- h 3))
@@ -167,13 +189,10 @@
                       (done done-color)
                       (t normal))))
           (with-attributes ((:color color)) frame
-                             (put-text frame row 1
+                             (put-text-clamped frame w h 
+                                               row 1
                                        (format nil "~3A: ~A" i item))))))
   
-
-; ----------------- New item dialog ----------------
-(defun new-item-render (&key frame h w)
-  (draw-box frame))
 
 (define-frame container (container-frame) :on :root)
 (define-frame choice (simple-frame :render 'choice-render) :on container :h 7)
@@ -182,6 +201,7 @@
 (define-frame input (edit-frame :prompt "New Item> ") :on new-item :h 1)
 
 (defvar *keys* (list))
+
 
 ; -------------------- Initialization ---------------
 (sort-ranking)
