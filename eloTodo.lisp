@@ -35,10 +35,11 @@
          (make-instance 'item
            :name (gethash "name" i)
            :rating (gethash "rating" i)
-           :matches (gethash "matches" i)))
+           :matches (gethash "matches" i)
+           :done (gethash "done" i)))
         (gethash "players" (jzon:parse in)))))
 
-(defvar *ranking* (load-json)) 
+(defvar *ranking* (remove-if (lambda (i) (item-done i)) (load-json))) 
 
 ; Write json output file
 (defun write-json () 
@@ -101,6 +102,7 @@
 (defvar normal (color-pair (color 750 750 750) (color 0 0 0)))
 (defvar inverse (color-pair (color 0 0 0) (color 1000 1000 1000)))
 (defvar selection (color-pair (color 0 0 0) (color 1000 1000 0)))
+(defvar done-color (color-pair (color 750 750 000) (color 0 0 0)))
 (defvar winner (color-pair (color 500 1000 500) (color 0 0 0)))
 (defvar loser (color-pair (color 1000 500 500) (color 0 0 0)))
 
@@ -155,14 +157,15 @@
   ; Put all items
   (loop for i from *list-scroll* below (length *ranking*)
         and row from 1 below (- h 1) do
-      (let ((item (elt *ranking* i)))
-        (if (eq *cursor-index* i)
-          (with-attributes ((:color selection)) frame
-                           (put-text frame row 1
-                                    (format nil "~3A: [~4A] ~A" i (item-rating item) (item-name item))))
-          (with-attributes ((:color normal)) frame
-                           (put-text frame row 1
-                                     (format nil "~3A: [~4A] ~A" i (item-rating item) (item-name item))))))))
+      (let* ((item (elt *ranking* i))
+             (done (item-done item))
+             (color (cond
+                      ((eq *cursor-index* i) selection)
+                      (done done-color)
+                      (t normal))))
+          (with-attributes ((:color color)) frame
+                             (put-text frame row 1
+                                       (format nil "~3A: ~A" i item))))))
           
 
 (define-frame container (container-frame) :on :root)
@@ -195,6 +198,11 @@
             ; Scroll list
             (:KEY-NPAGE (setf *cursor-index* (clamp (+ *cursor-index* 20) 0 (length *ranking*))))
             (:KEY-PPAGE (setf *cursor-index* (clamp (- *cursor-index* 20) 0 (length *ranking*))))
+
+            ; Done and undone
+            (#\d (setf (item-done (elt *ranking* *cursor-index*)) t))
+            (#\u (setf (item-done (elt *ranking* *cursor-index*)) nil))
+            (:KEY-RETURN (setf (item-done (elt *ranking* *cursor-index*)) nil))
 
             ; Compo time
             (:KEY-LEFT (score-compo -1))
