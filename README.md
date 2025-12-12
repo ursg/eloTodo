@@ -28,7 +28,8 @@ will always be in importance order.
  - ```Left``` / ```l``` / ``Right`` / ```r``` choose the left or right item of the current competition, respectively
  - ```Space``` skip the current competition, randomly select two new items
  - ```q``` quit
- - ```Shift-L``` reload Todo-list and rankings from the input file.
+ - ```Shift-L``` reload Todo-list and rankings from the input file. (This also clears all checked items from the list)
+ - ```a``` / ```n``` Add a new item to the list.
 
 The json file is automatically updated and saved on every change.
 
