@@ -93,9 +93,9 @@
                      (new-compo)))
      ((< winner 0) (progn
                      (score (first *current-compo*) (second *current-compo*))
-                     (new-compo)))
-   (sort-ranking)
-   (write-json)))
+                     (new-compo))))
+  (sort-ranking)
+  (write-json))
 
 
 ; --------------------- TUI --------------------------
