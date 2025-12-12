@@ -62,16 +62,22 @@
         (t v)))
 
 ; --------------- Competition handling ----------------
-(defvar *current-compo* (list (first *ranking*) (second *ranking*)))
+(defvar *current-compo*)
 
-; TODO: Bail out if only one entry in the ranking
 (defun new-compo ()
-  (let ((i (random (length *ranking*)))
-        (j (random (length *ranking*))))
-    (if (eq i j) 
-      (new-compo)
-      (setf *current-compo* 
-            (list (elt *ranking* i) (elt *ranking* j))))))
+  (let* ((not-done-items (remove-if (lambda (i) (item-done i)) *ranking*))
+         (i (random (max 1 (length not-done-items))))
+         (j (random (max 1 (length not-done-items)))))
+    (if (< (length not-done-items) 2)
+      ; If the list does not contain at least 2 TODO-Items, return a dummy
+      (setf *current-compo*
+            (list (make-instance 'item :name "Add some") (make-instance 'item :name "TODO items!")))
+
+      ; Otherwise, pick from the list
+      (if (eq i j) 
+        (new-compo)
+        (setf *current-compo* 
+              (list (elt not-done-items i) (elt not-done-items j)))))))
 
 ; Adjust elo score rating of two items after a match
 (defun score (winner loser)
@@ -210,8 +216,8 @@
 
 
 ; -------------------- Initialization ---------------
-(sort-ranking)
 (new-compo)
+(sort-ranking)
 
 ; --------------------- Main loop ------------------
 (with-screen (:colors)
@@ -236,23 +242,27 @@
             ; Done and undone
             (#\d (setf (item-done (elt *ranking* *cursor-index*)) t))
             (#\u (setf (item-done (elt *ranking* *cursor-index*)) nil))
-            (#\Newline (setf (item-done (elt *ranking* *cursor-index*)) (not (item-done (elt *ranking* *cursor-index*)))))
+            (#\Newline (progn
+                         (setf (item-done (elt *ranking* *cursor-index*)) (not (item-done (elt *ranking* *cursor-index*))))
+                         (new-compo)))
 
             ; New item
-            (#\n (progn
-                   (display 'new-item)
-                   (loop
-                     (refresh)
-                     (let ((key (read-key)))
-                       (case key
-                         (#\Esc (return))
-                         (#\Newline (progn
-                                      (push (make-instance 'item :name (get-text 'input)) *ranking*)
-                                      (sort-ranking)
-                                      ;(write-json)
-                                      (return)))
-                         (t (handle-key 'input key)))))
-                   (display :root)))
+            ((#\n #\a) (progn
+                         (clear-text 'input)
+                         (display 'new-item)
+                         (loop
+                           (refresh)
+                           (let ((key (read-key)))
+                             (case key
+                               (#\Esc (return))
+                               (#\Newline (progn
+                                            (push (make-instance 'item :name (get-text 'input)) *ranking*)
+                                            (sort-ranking)
+                                            ;(write-json)
+                                            (return)))
+                               (t (handle-key 'input key)))))
+                         (display :root)
+                         (new-compo)))
 
             ; Compo time
             ((#\l :KEY-LEFT) (score-compo -1))
