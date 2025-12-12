@@ -25,7 +25,7 @@
      :initform nil)))
 
 (defmethod print-object ((foo item) out)
-  (format out "[~A] ~A (~A): ~A" (if (item-done foo) "X" " ") (item-rating foo) (item-matches foo) (item-name foo)))
+  (format out "[~A] ~4A (~2A): ~A" (if (item-done foo) "X" " ") (item-rating foo) (item-matches foo) (item-name foo)))
 
 ; Read json input file
 (defun load-json ()
@@ -40,7 +40,7 @@
              :done (gethash "done" i)))
           (gethash "players" (jzon:parse in))))
     ; If the file does not exist, create two dummy todo-list items
-    (file-does-not-exist (e)
+    (file-does-not-exist ()
        (list 
          (make-instance 'item :name "Start filling TODO list")                  
          (make-instance 'item :name "Score TODO items up and down" :rating 1000)))))
