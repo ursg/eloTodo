@@ -29,15 +29,21 @@
 
 ; Read json input file
 (defun load-json ()
-  (with-open-file (in *filename*)
-   (map 'list
-        (lambda (i) 
-         (make-instance 'item
-           :name (gethash "name" i)
-           :rating (gethash "rating" i)
-           :matches (gethash "matches" i)
-           :done (gethash "done" i)))
-        (gethash "players" (jzon:parse in)))))
+  (handler-case
+    (with-open-file (in *filename*)
+     (map 'list
+          (lambda (i) 
+           (make-instance 'item
+             :name (gethash "name" i)
+             :rating (gethash "rating" i)
+             :matches (gethash "matches" i)
+             :done (gethash "done" i)))
+          (gethash "players" (jzon:parse in))))
+    ; If the file does not exist, create two dummy todo-list items
+    (file-does-not-exist (e)
+       (list 
+         (make-instance 'item :name "Start filling TODO list")                  
+         (make-instance 'item :name "Score TODO items up and down" :rating 1000)))))
 
 (defvar *ranking* (remove-if (lambda (i) (item-done i)) (load-json))) 
 
