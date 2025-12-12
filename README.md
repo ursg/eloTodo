@@ -1,6 +1,8 @@
 
 Elo Todo list
 
+![Screenshot of eloTodo](screenshot.png)
+
 ## Description
 
 A small commandline tool to manage a TODO list. Directly inpired and in fact compatible with [Elo Anything!](https://github.com/bytes-zone/elo-anything), but using a TUI instead of a browser-based implementation.
