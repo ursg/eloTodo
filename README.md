@@ -19,6 +19,12 @@ This is made as frictionless as possible, simply always offering you a scoring
 choice at the top of the screen. *If* you do so conscientiously, your TODO list
 will always be in importance order.
 
+## Installation
+
+eloTodo requires an installation of Common Lisp (currently, only [sbcl](https://www.sbcl.org/) has been tested) and [quicklisp](https://www.quicklisp.org/). With these installed, running from source is then a simple matter of
+```
+sbcl --load eloTodo.lisp
+```
 
 ## Keyboard reference
 
@@ -32,7 +38,6 @@ will always be in importance order.
  - ```a``` / ```n``` Add a new item to the list.
 
 The json file is automatically updated and saved on every change.
-
 
 ## Technical info
 

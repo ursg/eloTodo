@@ -1,11 +1,23 @@
-(ql:quickload 'infix-math)
-(use-package 'infix-math)
-(ql:quickload '#:com.inuoe.jzon)
-(sb-ext:add-package-local-nickname '#:jzon '#:com.inuoe.jzon) 
-(ql:quickload 'serapeum)
-(ql:quickload 'uiop)
+(require "asdf")
+(asdf:load-system "uiop")
 
-(defparameter *filename* "./todo.json")
+(push (concatenate 'string (namestring (uiop:getcwd)) "/third-party/infix-math/") asdf:*central-registry*)
+(asdf:load-system 'infix-math)
+(use-package 'infix-math)
+
+(push (concatenate 'string (namestring (uiop:getcwd)) "/third-party/jzon/") asdf:*central-registry*)
+(asdf:load-system 'com.inuoe.jzon)
+(sb-ext:add-package-local-nickname '#:jzon 'com.inuoe.jzon) 
+
+;(push (concatenate 'string (namestring (uiop:getcwd)) "/third-party/serapeum/") asdf:*central-registry*)
+(asdf:load-system "serapeum")
+
+(push (concatenate 'string (namestring (uiop:getcwd)) "/third-party/cl-tui/") asdf:*central-registry*)
+(asdf:load-system "cl-tui")
+(use-package 'cl-tui)
+
+
+(defvar *filename* "./todo.json")
 
 (defclass item ()
   ((name 
@@ -45,7 +57,7 @@
          (make-instance 'item :name "Start filling TODO list")                  
          (make-instance 'item :name "Score TODO items up and down" :rating 1000)))))
 
-(defvar *ranking* (remove-if (lambda (i) (item-done i)) (load-json))) 
+(defvar *ranking* (list)) 
 
 ; Write json output file
 (defun write-json () 
@@ -105,9 +117,6 @@
 
 
 ; --------------------- TUI --------------------------
-(ql:quickload 'cl-tui)
-(use-package 'cl-tui)
-
 (defun put-text-clamped (frame w h y x string)
   "Skip text that's out-of-frame"
    (if (>= x w) 
@@ -130,12 +139,12 @@
 (defvar *cursor-index* 0)
 
 ; Colors
-(defvar normal (color-pair (color 750 750 750) (color 0 0 0)))
-(defvar inverse (color-pair (color 0 0 0) (color 1000 1000 1000)))
-(defvar selection (color-pair (color 0 0 0) (color 1000 1000 0)))
-(defvar done-color (color-pair (color 750 750 000) (color 0 0 0)))
-(defvar winner (color-pair (color 500 1000 500) (color 0 0 0)))
-(defvar loser (color-pair (color 1000 500 500) (color 0 0 0)))
+(defconstant normal (color-pair (color 750 750 750) (color 0 0 0)))
+(defconstant inverse (color-pair (color 0 0 0) (color 1000 1000 1000)))
+(defconstant selection (color-pair (color 0 0 0) (color 1000 1000 0)))
+(defconstant done-color (color-pair (color 750 750 000) (color 0 0 0)))
+(defconstant winner (color-pair (color 500 1000 500) (color 0 0 0)))
+(defconstant loser (color-pair (color 1000 500 500) (color 0 0 0)))
 
 (defmacro with-winnerloser (check &body body)
   `(cond 
@@ -212,67 +221,65 @@
 (define-frame new-item (container-frame))
 (define-frame input (edit-frame :prompt "New Item> ") :on new-item :h 1)
 
-(defvar *keys* (list))
-
-
-; -------------------- Initialization ---------------
-(new-compo)
-(sort-ranking)
-
 ; --------------------- Main loop ------------------
-(with-screen (:colors)
-    (loop 
-       (refresh)
-       (let ((key (read-key)))
-          (case key
-            (#\q (return))
-            (#\Esc (return))
-            (#\L (progn
-                   (load-json)
-                   (sort-ranking)))
+(defun main (argv) 
+  (format t "Length of argv is ~A, its values are ~A~%" (length argv) argv)
+  (if (> (length argv) 1)
+    (setf *filename* (second argv)))
 
-            ; Cursor selection
-            (:KEY-UP (setf *cursor-index* (clamp (- *cursor-index* 1) 0 (length *ranking*))))
-            (:KEY-DOWN (setf *cursor-index* (clamp (+ *cursor-index* 1) 0 (length *ranking*))))
+  ; -------------------- Initialization ---------------
+  (setf *ranking* (remove-if (lambda (i) (item-done i)) (load-json))) 
+  (new-compo)
+  (sort-ranking)
+  (with-screen (:colors)
+      (loop 
+         (refresh)
+         (let ((key (read-key)))
+            (case key
+              (#\q (return))
+              (#\Esc (return))
+              (#\L (progn
+                     (load-json)
+                     (sort-ranking)))
 
-            ; Scroll list
-            (:KEY-NPAGE (setf *cursor-index* (clamp (+ *cursor-index* 20) 0 (length *ranking*))))
-            (:KEY-PPAGE (setf *cursor-index* (clamp (- *cursor-index* 20) 0 (length *ranking*))))
+              ; Cursor selection
+              (:KEY-UP (setf *cursor-index* (clamp (- *cursor-index* 1) 0 (length *ranking*))))
+              (:KEY-DOWN (setf *cursor-index* (clamp (+ *cursor-index* 1) 0 (length *ranking*))))
 
-            ; Done and undone
-            (#\d (setf (item-done (elt *ranking* *cursor-index*)) t))
-            (#\u (setf (item-done (elt *ranking* *cursor-index*)) nil))
-            (#\Newline (progn
-                         (setf (item-done (elt *ranking* *cursor-index*)) (not (item-done (elt *ranking* *cursor-index*))))
-                         (new-compo)))
+              ; Scroll list
+              (:KEY-NPAGE (setf *cursor-index* (clamp (+ *cursor-index* 20) 0 (length *ranking*))))
+              (:KEY-PPAGE (setf *cursor-index* (clamp (- *cursor-index* 20) 0 (length *ranking*))))
 
-            ; New item
-            ((#\n #\a) (progn
-                         (clear-text 'input)
-                         (display 'new-item)
-                         (loop
-                           (refresh)
-                           (let ((key (read-key)))
-                             (case key
-                               (#\Esc (return))
-                               (#\Newline (progn
-                                            (push (make-instance 'item :name (get-text 'input)) *ranking*)
-                                            (sort-ranking)
-                                            ;(write-json)
-                                            (return)))
-                               (t (handle-key 'input key)))))
-                         (display :root)
-                         (new-compo)))
+              ; Done and undone
+              (#\d (setf (item-done (elt *ranking* *cursor-index*)) t))
+              (#\u (setf (item-done (elt *ranking* *cursor-index*)) nil))
+              (#\Newline (progn
+                           (setf (item-done (elt *ranking* *cursor-index*)) (not (item-done (elt *ranking* *cursor-index*))))
+                           (new-compo)))
 
-            ; Compo time
-            ((#\l :KEY-LEFT) (score-compo -1))
-            ((#\r :KEY-RIGHT) (score-compo 1))
-            (#\Space (score-compo 0))
+              ; New item
+              ((#\n #\a) (progn
+                           (clear-text 'input)
+                           (display 'new-item)
+                           (loop
+                             (refresh)
+                             (let ((key (read-key)))
+                               (case key
+                                 (#\Esc (return))
+                                 (#\Newline (progn
+                                              (push (make-instance 'item :name (get-text 'input)) *ranking*)
+                                              (sort-ranking)
+                                              ;(write-json)
+                                              (return)))
+                                 (t (handle-key 'input key)))))
+                           (display :root)
+                           (new-compo)))
 
-            (otherwise (push (format nil "Key pressed: ~A" key) *keys*))))))
+              ; Compo time
+              ((#\l :KEY-LEFT) (score-compo -1))
+              ((#\r :KEY-RIGHT) (score-compo 1))
+              (#\Space (score-compo 0))))))
 
-(loop for i in *keys* do
-  (format t "~A~%" i))
 
-(write-json)
-(uiop:quit)
+  (write-json)
+  (uiop:quit))
