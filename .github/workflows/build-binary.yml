@@ -1,0 +1,112 @@
+name: Compile eloTodo binary
+
+## Based on https://github.com/may/common-lisp-github-actions/blob/main/.github/workflows/compile-and-release.yml
+
+## Compile Common Lisp inside GitHub Actions in a platform-independent way.
+## This script sets up the Common Lisp envionments, then hands it off to the
+## ../configure-and-compile.lisp
+
+## Created: 2024-01-20
+## Revised: 2024-01-22
+
+## Copyright 2024 Nicholas E. May
+## Licensed under the Apache License, Version 2.0 (the "License");
+## you may not use this file except in compliance with the License.
+## You may obtain a copy of the License at
+
+##     http://www.apache.org/licenses/LICENSE-2.0
+
+## Unless required by applicable law or agreed to in writing, software
+## distributed under the License is distributed on an "AS IS" BASIS,
+## WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+## See the License for the specific language governing permissions and
+## limitations under the License.
+
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Compile using ${{ matrix.lisp }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }} # will run all lisps on all OS, except as excluded below
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        # If you only care about one lisp, remove the rest from the list here,
+        # and remove the 'exclude:' block, below.
+        # (Clasp would be nice, but no built-in packaging for it.)
+        lisp: [sbcl, ecl, clisp, abcl]
+        exclude:
+        - os: windows-latest
+          lisp: ecl # no easy install
+        - os: windows-latest
+          lisp: abcl # no easy install
+    env:
+      # What is the system we should compile?
+      # Please provide an unquoted string not a symbol.
+      cl-system: elotodo
+
+      # Should we release executables in addition to compiling? (true/false)
+      # This needs to live here, rather than in the helper script, so we can
+      # conditionally execute the steps to upload the finished executables.
+      cl-release: true
+
+      # What do you want your executable to be called, without any file extensions?
+      # For example, if you put 'main' in here, you'll get:
+      #  'main' for GNU/Linux and MacOS and
+      #  'main.exe' for Windows
+      # This is the name your users will see, although obviously you can rename
+      # the file later if you choose..
+      cl-exe-basename: eloTodo
+
+      # What is the 'main' entry function of your program, that should be called
+      # upon launch of your executable?
+      # Please just the function name, no need to provide the package name here.
+      cl-exe-entry-function: main
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Common Lisp on Ubuntu
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt update # important
+        sudo apt install sbcl -y
+
+    - name: Install Common Lisp on macOS
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install sbcl
+
+    - name: Install Common Lisp on Windows
+      if: matrix.os == 'windows-latest'
+      run: |
+        choco install sbcl
+
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install Quicklisp, compiles Common Lisp program with ${{ matrix.lisp }}
+      if: matrix.lisp == 'sbcl'
+      run: sbcl --non-interactive --load make.lisp
+
+    - name: Upload executable for Windows
+      if: matrix.os == 'windows-latest' && env.cl-release == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: compiled-program-${{ matrix.os }}
+        path: ${{ format('{0}.exe', env.cl-exe-basename) }} # ex. main.exe
+
+    - name: Upload executable for non-Windows
+      if: matrix.os != 'windows-latest' && env.cl-release == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: compiled-program-${{ matrix.os }} # ex. main
+        path: ${{ env.cl-exe-basename }}

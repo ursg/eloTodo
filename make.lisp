@@ -9,4 +9,5 @@
 
 (push (concatenate 'string (namestring (uiop:getcwd)) "/") asdf:*central-registry*)
 
+(ql:quickload :elotodo)
 (asdf:make :elotodo)
