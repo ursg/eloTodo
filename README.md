@@ -21,10 +21,16 @@ will always be in importance order.
 
 ## Installation
 
-eloTodo requires an installation of Common Lisp (currently, only [sbcl](https://www.sbcl.org/) has been tested) and [quicklisp](https://www.quicklisp.org/). With these installed, running from source is then a simple matter of
+eloTodo requires an installation of Common Lisp (currently, only [sbcl](https://www.sbcl.org/) has been tested) and [quicklisp](https://www.quicklisp.org/). With these installed, you can run it directly from the sources as
 ```
-sbcl --load eloTodo.lisp
+sbcl  --eval "(asdf:load-asd \"$(pwd)/elotodo.asd\")"  --eval "(ql:quickload :eloTodo)"  --eval "(eloTodo:main)"
 ```
+
+Alternatively, you can compile a binary executable by running
+```
+sbcl --load make.lisp
+```
+which should produce an ```eloTodo``` or ```eloTodo.exe``` file for your platform.
 
 ## Keyboard reference
 

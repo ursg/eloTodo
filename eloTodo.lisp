@@ -1,21 +1,4 @@
-(require "asdf")
-(asdf:load-system "uiop")
-
-(push (concatenate 'string (namestring (uiop:getcwd)) "/third-party/infix-math/") asdf:*central-registry*)
-(asdf:load-system 'infix-math)
-(use-package 'infix-math)
-
-(push (concatenate 'string (namestring (uiop:getcwd)) "/third-party/jzon/") asdf:*central-registry*)
-(asdf:load-system 'com.inuoe.jzon)
-(sb-ext:add-package-local-nickname '#:jzon 'com.inuoe.jzon) 
-
-;(push (concatenate 'string (namestring (uiop:getcwd)) "/third-party/serapeum/") asdf:*central-registry*)
-(asdf:load-system "serapeum")
-
-(push (concatenate 'string (namestring (uiop:getcwd)) "/third-party/cl-tui/") asdf:*central-registry*)
-(asdf:load-system "cl-tui")
-(use-package 'cl-tui)
-
+(in-package #:elotodo)
 
 (defvar *filename* "./todo.json")
 
@@ -50,7 +33,7 @@
              :rating (gethash "rating" i)
              :matches (gethash "matches" i)
              :done (gethash "done" i)))
-          (gethash "players" (jzon:parse in))))
+          (gethash "players" (com.inuoe.jzon:parse in))))
     ; If the file does not exist, create two dummy todo-list items
     (file-does-not-exist ()
        (list 
@@ -62,7 +45,7 @@
 ; Write json output file
 (defun write-json () 
   (with-open-file (out *filename* :direction :output :if-exists :supersede)
-    (jzon:stringify (serapeum:dict "players" *ranking*) :stream out :pretty t)))
+    (com.inuoe.jzon:stringify (serapeum:dict "players" *ranking*) :stream out :pretty t)))
 
 (defun sort-ranking ()
   "Sort the TODO-list by elo rating"
@@ -139,12 +122,12 @@
 (defvar *cursor-index* 0)
 
 ; Colors
-(defconstant normal (color-pair (color 750 750 750) (color 0 0 0)))
-(defconstant inverse (color-pair (color 0 0 0) (color 1000 1000 1000)))
-(defconstant selection (color-pair (color 0 0 0) (color 1000 1000 0)))
-(defconstant done-color (color-pair (color 750 750 000) (color 0 0 0)))
-(defconstant winner (color-pair (color 500 1000 500) (color 0 0 0)))
-(defconstant loser (color-pair (color 1000 500 500) (color 0 0 0)))
+(defparameter normal (color-pair (color 750 750 750) (color 0 0 0)))
+(defparameter inverse (color-pair (color 0 0 0) (color 1000 1000 1000)))
+(defparameter selection (color-pair (color 0 0 0) (color 1000 1000 0)))
+(defparameter done-color (color-pair (color 750 750 000) (color 0 0 0)))
+(defparameter winner (color-pair (color 500 1000 500) (color 0 0 0)))
+(defparameter loser (color-pair (color 1000 500 500) (color 0 0 0)))
 
 (defmacro with-winnerloser (check &body body)
   `(cond 
@@ -222,10 +205,11 @@
 (define-frame input (edit-frame :prompt "New Item> ") :on new-item :h 1)
 
 ; --------------------- Main loop ------------------
-(defun main (argv) 
-  (format t "Length of argv is ~A, its values are ~A~%" (length argv) argv)
-  (if (> (length argv) 1)
-    (setf *filename* (second argv)))
+(defun main ()
+  ;(argv) 
+  ;(format t "Length of argv is ~A, its values are ~A~%" (length argv) argv)
+  ;(if (> (length argv) 1)
+  ;  (setf *filename* (second argv))
 
   ; -------------------- Initialization ---------------
   (setf *ranking* (remove-if (lambda (i) (item-done i)) (load-json))) 
