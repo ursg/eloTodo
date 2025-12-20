@@ -151,16 +151,17 @@
         (points2 (item-rating (second *current-compo*))))
     (with-winnerloser (- points1 points2)
       (put-text-clamped frame w h
-                  (floor (/ h 2))
+                  (floor (- (/ h 2) 1))
                   (floor ($ (w / 4) - (length name1) / 2 - 3)) 
                   (format nil "[~4A] ~A" points1 name1)))
-    (put-text-clamped frame w h
-                (floor (/ h 2)) 
-                (floor (/ w 2))
-                "<=>")
-    (with-winnerloser (- points2 points1)
+    (with-attributes ((:color normal)) frame
       (put-text-clamped frame w h
                   (floor (/ h 2)) 
+                  (floor (/ w 2))
+                  "<=>"))
+    (with-winnerloser (- points2 points1)
+      (put-text-clamped frame w h
+                  (floor (+ (/ h 2) 1)) 
                   (floor ($ (w / 2) + (w / 4) - (length name2) / 2 - 3))
                   (format nil "[~4A] ~A" points2 name2)))))
 
