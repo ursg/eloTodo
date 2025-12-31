@@ -59,9 +59,31 @@
 ; --------------- Competition handling ----------------
 (defvar *current-compo*)
 
+(defun prefix-sum (l &optional (pre 0))
+  "Creates a list with the inclusive prefix sum for each element"
+  (if (not l)
+    ()
+    (cons (+ pre (car l)) (prefix-sum (cdr l) (+ pre (car l))))))
+
+(defun weighted-random-choice (items)
+  "Select a random item from the given list such that
+  items are favoured if they have not participated in
+  many competitions"
+  (let* ((probs 
+           (map 'list 
+             (lambda (i)
+                ($ 10 * (exp (- (item-matches i) / (sqrt (length items))))))
+             items))
+         (cumulants (prefix-sum probs))
+         (i (random (car (last cumulants)))))
+      (loop for j from 0 below (length items)
+         and c in cumulants do
+        (if (> c i)
+           (return-from weighted-random-choice j)))))
+
 (defun new-compo ()
   (let* ((not-done-items (remove-if (lambda (i) (item-done i)) *ranking*))
-         (i (random (max 1 (length not-done-items))))
+         (i (weighted-random-choice not-done-items))
          (j (random (max 1 (length not-done-items)))))
     (if (< (length not-done-items) 2)
       ; If the list does not contain at least 2 TODO-Items, return a dummy
